@@ -3,14 +3,29 @@ import sqlite3
 from datetime import datetime
 from pynput import mouse, keyboard
 import os
+import sys
+import atexit
 
 # ================= CONFIG =================
 IDLE_THRESHOLD = 15 * 60  # 15 minutes
 LOG_INTERVAL = 10  # seconds
 DB_FILE = "activity.db"
+LOCK_FILE = "tracker.lock"
+
+# ================= SINGLE INSTANCE LOCK =================
+if os.path.exists(LOCK_FILE):
+    sys.exit()
+
+open(LOCK_FILE, "w").close()
+
+def cleanup():
+    if os.path.exists(LOCK_FILE):
+        os.remove(LOCK_FILE)
+
+atexit.register(cleanup)
 
 # ================= DB SETUP =================
-conn = sqlite3.connect(DB_FILE)
+conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
@@ -46,8 +61,6 @@ def log_event(status=None, idle_seconds=None, event=None):
     conn.commit()
 
 # ================= MAIN LOOP =================
-print("Tracker started...")
-
 try:
     while True:
         current_time = time.time()
@@ -57,7 +70,7 @@ try:
         if current_time - prev_time > 60:
             log_event(event="System Sleep Detected")
 
-        # Determine status
+        # Status logic
         if idle_time > IDLE_THRESHOLD:
             status = "Idle-Long"
 
@@ -73,6 +86,8 @@ try:
         prev_time = current_time
         time.sleep(LOG_INTERVAL)
 
-except KeyboardInterrupt:
-    print("Stopping tracker...")
+except Exception as e:
+    log_event(event=f"Crash: {str(e)}")
+
+finally:
     conn.close()
