@@ -8,4 +8,4 @@ pip install pynput pandas openpyxl
 
 
 pip install streamlit pandas matplotlib
-streamlit run dashboard.py
+streamlit run dashboard.py 
